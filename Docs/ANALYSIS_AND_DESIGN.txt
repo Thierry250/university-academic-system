@@ -1,0 +1,320 @@
+UNIVERSITY COURSE REGISTRATION AND ACADEMIC MANAGEMENT SYSTEM
+Web Technology and Internet - Individual Assignment
+
+Student Name: Ndayisenga Thierry
+Registration No.: 22812
+
+======================================================================
+1. PROBLEM ANALYSIS
+======================================================================
+
+The university still keeps its academic records by hand. Because of
+this, it is hard to manage student records, organize courses, assign
+lecturers, and track registrations. The system I am building stores
+departments, students, student profiles, lecturers, courses, and
+course registrations.
+
+I read the problem statement line by line and wrote down the rules it
+gives me:
+
+R-a. The university has several departments.
+R-b. A department offers many courses. A course belongs to one department.
+R-c. A department employs many lecturers.
+R-d. Every department has one lecturer who serves as its head.
+R-e. A student is admitted into one department.
+R-f. A student has exactly one profile. A profile belongs to one student.
+R-g. A lecturer teaches many courses. A course has many lecturers.
+     The assignment says this must not get a separate entity.
+R-h. A student registers for many courses. A course has many students.
+     Each registration records the date, academic year, semester,
+     status (PENDING, APPROVED, or REJECTED), and grade.
+
+======================================================================
+2. TASK 1 - ENTITIES
+======================================================================
+
+I found six entities. I looked for the things in the statement that
+have details of their own, and for links between things that carry
+data of their own.
+
+1. Department
+   The university has several of them. A department owns courses,
+   lecturers, and students, so it sits at the centre of the model.
+
+2. Student
+   A person admitted into the university and placed in one department.
+
+3. StudentProfile
+   The statement says each student has one personal profile with a
+   date of birth, gender, phone number, and address. These details
+   belong together, so I made the profile its own entity with a
+   one-to-one link to Student.
+
+4. Lecturer
+   A person employed by a department. One lecturer also serves as
+   head of that department.
+
+5. Course
+   A subject offered by one department.
+
+6. Registration
+   The link between a student and a course carries its own data:
+   date, academic year, semester, status, and grade. A link that
+   carries data needs to be an entity. This is my join entity.
+
+I did not create an entity for the Lecturer and Course link. The
+statement says it must be kept without a separate entity, so a plain
+join table handles it.
+
+======================================================================
+3. TASK 2 - ATTRIBUTES
+======================================================================
+
+(S) means the problem statement names the attribute.
+(D) means I added it so each record is easy to identify. I kept these
+few and ordinary.
+
+Department
+  id (PK)
+  name           (D) unique
+  code           (D) unique, short code such as CS
+  head           (S) link to one Lecturer
+
+Student
+  id (PK)
+  studentNumber  (D) unique university number
+  firstName      (D)
+  lastName       (D)
+  email          (D) unique
+  department     (S) link to Department
+
+StudentProfile
+  id (PK)
+  dateOfBirth    (S)
+  gender         (S)
+  phoneNumber    (S)
+  address        (S) residential address
+  student        (S) link to Student
+
+Lecturer
+  id (PK)
+  firstName      (D)
+  lastName       (D)
+  email          (D) unique
+  department     (S) link to Department
+
+Course
+  id (PK)
+  code           (D) unique
+  title          (D)
+  credits        (D)
+  department     (S) link to Department
+
+Registration
+  id (PK)
+  student          (S) link to Student
+  course           (S) link to Course
+  registrationDate (S)
+  academicYear     (S) example 2026/2027
+  semester         (S) example Semester 1
+  status           (S) PENDING, APPROVED, or REJECTED
+  grade            (S) stays empty until a grade is recorded
+
+Data types I chose
+  id                    Long (BIGSERIAL)
+  text fields           String (VARCHAR)
+  dateOfBirth           LocalDate (DATE)
+  registrationDate      LocalDate (DATE)
+  credits               Integer (INTEGER)
+  grade                 Double (DOUBLE PRECISION), nullable
+  status                Enum stored as text (VARCHAR)
+
+The statement does not give fixed values for semester or academic
+year, so I stored both as text.
+
+======================================================================
+4. TASKS 3 AND 4 - RELATIONSHIPS AND CARDINALITY
+======================================================================
+
+No.  Relationship                      Cardinality   Implemented with
+---  --------------------------------  ------------  -----------------------------
+1    Department offers Course          One to many   courses.department_id (FK)
+2    Department employs Lecturer       One to many   lecturers.department_id (FK)
+3    Department has head Lecturer      One to one    departments.head_lecturer_id (FK, unique)
+4    Department admits Student         One to many   students.department_id (FK)
+5    Student has StudentProfile        One to one    student_profiles.student_id (FK, unique)
+6    Lecturer teaches Course           Many to many  lecturer_courses (join table)
+7    Student registers for Course      Many to many  registrations (join entity)
+     Student makes Registration        One to many   registrations.student_id (FK)
+     Course receives Registration      One to many   registrations.course_id (FK)
+
+My reasoning for each one
+
+1. A department offers several courses, and each course belongs to
+   one department.
+2. A department employs several lecturers, and each lecturer works in
+   one department.
+3. Each department has one head, and a lecturer heads at most one
+   department. I kept this apart from relationship 2. Relationship 2
+   says where a lecturer works. Relationship 3 says who leads the
+   department. The head column allows an empty value in the database.
+   This lets me save a department first, then its lecturers, then set
+   the head. The rule that the head must work in the same department
+   belongs in the service layer, which comes in a later stage.
+4. Each student is assigned to one department, and a department has
+   many students.
+5. A student has one profile and a profile belongs to one student.
+6. A lecturer teaches many courses and a course has many lecturers.
+   No separate entity is allowed, so I used a join table.
+7. A student registers for many courses and a course has many
+   students. The link carries data, so it becomes the Registration
+   entity. This splits the many-to-many into two one-to-many links.
+
+======================================================================
+5. TASK 5 - RELATIONSHIPS THAT NEED A FOREIGN KEY
+======================================================================
+
+In every one-to-many link I put the foreign key on the many side.
+In the one-to-one links I put it on the table that depends on the
+other one.
+
+1. courses.department_id        references departments.id
+2. lecturers.department_id      references departments.id
+3. departments.head_lecturer_id references lecturers.id (unique)
+4. students.department_id       references departments.id
+5. student_profiles.student_id  references students.id (unique)
+7. registrations.student_id     references students.id
+   registrations.course_id      references courses.id
+
+A profile has no meaning without its student, so its foreign key sits in
+student_profiles. For the head, I placed the column in departments.
+The lecturers table already holds the department link from
+relationship 2, and a second department column there would be
+confusing.
+
+======================================================================
+6. TASK 6 - RELATIONSHIP THAT NEEDS A JOIN TABLE
+======================================================================
+
+Lecturer to Course (many to many, relationship 6).
+
+Table: lecturer_courses
+  lecturer_id  FK to lecturers.id
+  course_id    FK to courses.id
+  Primary key: (lecturer_id, course_id)
+
+The table holds no other column. That is why it needs no entity.
+
+======================================================================
+7. TASK 7 - RELATIONSHIP THAT NEEDS A JOIN ENTITY
+======================================================================
+
+Student to Course (many to many, relationship 7).
+
+Entity: Registration. The link holds five extra attributes: the
+registration date, academic year, semester, status, and grade. A plain
+join table has no place for extra columns, so I used an entity.
+
+Registration has its own generated id and two foreign keys, one to
+Student and one to Course. I added a unique constraint on
+(student_id, course_id, academic_year, semester). It stops a student
+from registering for the same course twice in the same term. A student
+still retakes a course in a later term.
+
+======================================================================
+8. TASK 8 - ERD
+======================================================================
+
+The diagram is in erd.png and erd.svg in this folder. The source file
+is erd.dot.
+
+I used crow's foot notation.
+  Double bar     exactly one
+  Circle + bar   zero or one
+  Circle + crow  zero or many
+The dashed line is the head of department link (relationship 3).
+The gold header marks the join table. The green header marks the
+join entity.
+
+======================================================================
+9. TASK 9 - RELATIONAL SCHEMA
+======================================================================
+
+departments (
+  id PK,
+  name,
+  code,
+  head_lecturer_id FK -> lecturers.id
+)
+
+lecturers (
+  id PK,
+  first_name,
+  last_name,
+  email,
+  department_id FK -> departments.id
+)
+
+courses (
+  id PK,
+  code,
+  title,
+  credits,
+  department_id FK -> departments.id
+)
+
+lecturer_courses (
+  lecturer_id PK, FK -> lecturers.id,
+  course_id   PK, FK -> courses.id
+)
+
+students (
+  id PK,
+  student_number,
+  first_name,
+  last_name,
+  email,
+  department_id FK -> departments.id
+)
+
+student_profiles (
+  id PK,
+  date_of_birth,
+  gender,
+  phone_number,
+  address,
+  student_id FK -> students.id (unique)
+)
+
+registrations (
+  id PK,
+  student_id FK -> students.id,
+  course_id  FK -> courses.id,
+  registration_date,
+  academic_year,
+  semester,
+  status,
+  grade
+)
+
+Full SQL: relational_schema.sql
+
+======================================================================
+10. HIBERNATE ANNOTATION MAP
+======================================================================
+
+Department.head              @OneToOne + @JoinColumn(name = "head_lecturer_id", unique = true)
+Department.lecturers         @OneToMany(mappedBy = "department")
+Department.courses           @OneToMany(mappedBy = "department")
+Department.students          @OneToMany(mappedBy = "department")
+Lecturer.department          @ManyToOne + @JoinColumn(name = "department_id")
+Lecturer.courses             @ManyToMany + @JoinTable(name = "lecturer_courses")
+Course.department            @ManyToOne + @JoinColumn(name = "department_id")
+Course.lecturers             @ManyToMany(mappedBy = "courses")
+Course.registrations         @OneToMany(mappedBy = "course")
+Student.department           @ManyToOne + @JoinColumn(name = "department_id")
+Student.profile              @OneToOne(mappedBy = "student")
+Student.registrations        @OneToMany(mappedBy = "student")
+StudentProfile.student       @OneToOne + @JoinColumn(name = "student_id", unique = true)
+Registration.student         @ManyToOne + @JoinColumn(name = "student_id")
+Registration.course          @ManyToOne + @JoinColumn(name = "course_id")
